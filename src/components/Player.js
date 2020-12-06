@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React from "react";
 // Components
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -8,14 +8,17 @@ import {
   faPause,
 } from "@fortawesome/free-solid-svg-icons";
 
-const Player = ({ currentSong, isPlaying, setIsPlaying }) => {
-  // States
-  const [songInfo, setSongInfo] = useState({
-    currentTime: 0,
-    duration: 0,
-  });
-  // Ref
-  const audioRef = useRef(null);
+const Player = ({
+  songInfo,
+  isPlaying,
+  setIsPlaying,
+  audioRef,
+  setSongInfo,
+  currentSong,
+  setCurrentSong,
+  songs,
+  setSongs,
+}) => {
   // Handlers
   const songPlayHandler = () => {
     if (isPlaying) {
@@ -26,15 +29,39 @@ const Player = ({ currentSong, isPlaying, setIsPlaying }) => {
       audioRef.current.play();
     }
   };
-  const timeUpdateHandler = (event) => {
-    const currentTime = event.target.currentTime;
-    const duration = event.target.duration;
-    setSongInfo({ ...songInfo, currentTime, duration });
-  };
 
+  const activeLibraryHandler = (currentSong) => {
+    setSongs(
+      songs.map((song) => {
+        if (song.id === currentSong.id) {
+          return { ...song, active: true };
+        } else {
+          return { ...song, active: false };
+        }
+      })
+    );
+  };
   const dragHandler = (event) => {
     setSongInfo({ ...songInfo, currentTime: event.target.value });
     audioRef.current.currentTime = event.target.value;
+  };
+
+  const skipTrackHandler = async (direction) => {
+    let index = songs.findIndex((song) => song.id === currentSong.id);
+    // setCurrentSong({ ...currentSong, active: false });
+    if (direction === "skip-forward") {
+      await setCurrentSong(
+        songs[(index + 1) % songs.length === 0 ? 0 : index + 1]
+      );
+      activeLibraryHandler(
+        songs[(index + 1) % songs.length === 0 ? 0 : index + 1]
+      );
+    }
+    if (direction === "skip-backward") {
+      await setCurrentSong(songs[index - 1 < 0 ? songs.length - 1 : index - 1]);
+      activeLibraryHandler(songs[index - 1 < 0 ? songs.length - 1 : index - 1]);
+    }
+    if (isPlaying) audioRef.current.play();
   };
 
   // Functions
@@ -48,30 +75,47 @@ const Player = ({ currentSong, isPlaying, setIsPlaying }) => {
     <div className="player">
       <div className="time-controls">
         <p>{getFormattedTime(songInfo.currentTime)}</p>
-        <input
-          type="range"
-          min={0}
-          max={songInfo.duration}
-          value={songInfo.currentTime}
-          onChange={dragHandler}
-        />
-        <p>{getFormattedTime(songInfo.duration)}</p>
+        <div
+          style={{
+            background: `linear-gradient(to right, ${currentSong.color[0]}, ${currentSong.color[1]})`,
+          }}
+          className="track"
+        >
+          <input
+            type="range"
+            min={0}
+            max={songInfo.duration || 0}
+            value={songInfo.currentTime}
+            onChange={dragHandler}
+          />
+          <div
+            style={{
+              transform: `translateX(${songInfo.animationPercentage}%)`,
+            }}
+            className="animate-track"
+          ></div>
+        </div>
+        <p>
+          {songInfo.duration ? getFormattedTime(songInfo.duration) : "0:00"}
+        </p>
       </div>
       <div className="player-controls">
-        <FontAwesomeIcon icon={faAngleLeft} size="2x" />
+        <FontAwesomeIcon
+          onClick={() => skipTrackHandler("skip-backward")}
+          icon={faAngleLeft}
+          size="2x"
+        />
         <FontAwesomeIcon
           onClick={songPlayHandler}
           icon={isPlaying ? faPause : faPlay}
           size="2x"
         />
-        <FontAwesomeIcon icon={faAngleRight} size="2x" />
+        <FontAwesomeIcon
+          onClick={() => skipTrackHandler("skip-forward")}
+          icon={faAngleRight}
+          size="2x"
+        />
       </div>
-      <audio
-        onLoadedMetadata={timeUpdateHandler}
-        onTimeUpdate={timeUpdateHandler}
-        ref={audioRef}
-        src={currentSong.audio}
-      ></audio>
     </div>
   );
 };
